@@ -5,61 +5,177 @@
     <title>Chat App</title>
     <link rel="icon" href="/img/favicon.png">
     <link rel="stylesheet" href="/css/styles.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/vue/dist/vue.js"></script>
+
+    <style> 
+    .messageList {
+        background:white;
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow:0 7px 17px -3px rgba(0, 0, 0, 0.08);
+        cursor: pointer;
+        transition: all .2s
+    }
+    .messageList:hover {
+        transform: scale(1.02);
+    }
+    </style>
 </head>
 
 <body>
+ <div id="vapp">
     <div class="chat">
         <div id="sidebar" class="chat__sidebar">
-
+    <div id="sidebar-template">
+        <h2 class="room-title">{{room}}</h2>
+        <h3 class="list-title">Users</h3>
+        <ul class="users">
+                <li v-for = "user in users">{{user.username}}</li>
+        </ul>
+    </div>
         </div>
         <div class="chat__main">
-            <div id="messages" class="chat__messages"></div>
+            <div id="messages" class="chat__messages" style="background:#ece8ff">
+                <div id="message-template">
+            <div v-for= "item in rMessage" class="message messageList">
+                <div @click="selectMessage(item.text)">
+                     <p>
+                    <span class="message__name">{{ item.username }}</span>
+                    <span class="message__meta">{{ item.createdAt }}</span>
+                </p>
+                <p> {{item.text}}</p>
+                </div>
+               
+            </div>
+            <div v-show="actions">
+            <span>
+                <button v-if="isDecrypt" @click="decrypt()" id="decrypt" style="font-size:12px;color:white;background:#1b1b1b;padding:5px">
+                    Decrypt Message
+                </button>
+                <!-- <button v-else="isDecrypt" @click="encrypt()" id="decrypt" style="margin-left:10px;font-size:12px;color:white;background:#f54747;padding:5px">
+                    Encrypt Message
+                </button> -->
+            </span>    
+            </div>
+            
+        </div>
+            </div>
 
             <div class="compose">
                 <form id="message-form">
-                    <input name="message" placeholder="Message" required autocomplete="off">
-                    <button>Send</button>
+                    <input v-model="message" name="message" placeholder="Message" required autocomplete="off">
+                    <button @click ="sendMessage">Send</button>
                 </form>
-                <button id="send-location">Send location</button>
             </div>
         </div>
     </div>
 
-    <script id="message-template" type="text/html">
-            <div class="message">
-                <p>
-                    <span class="message__name">{{username}}</span>
-                    <span class="message__meta">{{createdAt}}</span>
-                </p>
-                <p>{{message}}</p>
-            </div>
-        </script>
 
-    <script id="location-message-template" type="text/html">
-            <div class="message">
-                <p>
-                    <span class="message__name">{{username}}</span>
-                    <span class="message__meta">{{createdAt}}</span>
-                </p>
-                <p><a href="{{url}}" target="_blank">My current location</a></p>
-            </div>
-        </script>
 
-    <script id="sidebar-template" type="text/html">
-        <h2 class="room-title">{{room}}</h2>
-        <h3 class="list-title">Users</h3>
-        <ul class="users">
-            {{#users}}
-                <li>{{username}}</li>
-            {{/users}}
-        </ul>
-    </script>
 
+ </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.0.0/crypto-js.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mustache.js/3.0.1/mustache.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qs/6.6.0/qs.min.js"></script>
     <script src="/socket.io/socket.io.js"></script>
     <script src="/js/chat.js"></script>
+
+
+    <script>
+        const vueApp = new Vue({
+          el: '#vapp',
+          data: { 
+            newMessage: 'redbox',
+            room: '',
+            users: [],
+            message: '',
+            rMessage: [],
+            encryptedText: '',
+            key : "something",
+            isDecrypt: true,
+            selectedText: '',
+            actions: false
+          },
+     created(){
+
+         socket.on('message', (message) => {
+            console.log(message)
+            var encrypted = CryptoJS.AES.encrypt(message.text, this.key);
+    
+            console.log("Encrypted: "+encrypted);
+
+            this.rMessage.push({
+                username: message.username,
+                  text:  encrypted.toString(),
+             createdAt: moment(message.createdAt).format('h:mm a')
+            })
+   })
+
+            socket.on('roomData', ({ room, users }) => {
+           this.room = room 
+           this.users = users
+           console.log(room)
+            })
+
+         socket.emit('join', { username, room }, (error) => {
+           if (error) {
+        alert(error)
+        location.href = '/'
+         }
+            })
+          },
+          methods:{
+            selectMessage(text){
+           this.selectedText = text
+           this.actions = true
+           this.isDecrypt = true
+            },
+              sendMessage(e){
+    e.preventDefault()
+
+    socket.emit('sendMessage', this.message, (error) => {
+        if (error) {
+            return console.log(error)
+        }
+        this.isDecrypt = true
+        this.actions = false
+        console.log('Message delivered!')
+    })
+              
+          },
+
+        decrypt() { 
+          //Find index of specific object using findIndex method.    
+objIndex = this.rMessage.findIndex((obj => obj.text == this.selectedText));
+
+let decrypted = CryptoJS.AES.decrypt(this.selectedText, this.key).toString(CryptoJS.enc.Utf8);
+//Update object's name property.
+this.rMessage[objIndex].text = decrypted
+  this.isDecrypt = false
+          },
+
+          encrypt() { 
+          //Find index of specific object using findIndex method.    
+objIndex = this.rMessage.findIndex((obj => obj.text == this.selectedText));
+
+let encrypted = CryptoJS.AES.encrypt(this.selectedText, this.key);
+//Update object's name property.
+this.rMessage[objIndex].text = encrypted.toString()
+this.isDecrypt = true
+
+        }
+
+    }
+
+        
+
+
+
+        })
+        </script>
 </body>
 
 </html>

@@ -115,7 +115,13 @@ button:disabled {
 /* Message Styles */
 
 .message {
-    margin-bottom: 16px;   
+    margin-bottom: 16px; 
+    background:red;  
+}
+
+
+.messageList:hover{
+    border: 1px solid #1b1b1b;
 }
 
 .message__name {
